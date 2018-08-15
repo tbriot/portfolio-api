@@ -17,21 +17,23 @@ def get_portfolio_holdings(port_id):
             with conn.cursor() as cur:
                 print("cursor up")
                 sql = (
-                    "SELECT ticker, SUM(quantity) AS qty, "
-                    "SUM(quantity * price) AS pos_cost, "
-                    "SUM(quantity * price * exchange_rate) AS pos_cost_local, "
-                    "SUM(fee / IF(price_currency_code!=fee_currency_code, exchange_rate, 1)) AS fee_cost, "
-                    "MIN(local_currency_code), MIN(price_currency_code), MIN(fee_currency_code)"
-                     "FROM investornetwork.trade "
+                    "SELECT symbol, market, "
+                    "SUM(quantity) AS qty, "
+                    "SUM(IF(transaction_type='SELL', -1, 1) * quantity * security_price "
+                        "+ fee * (IFNULL(fee_currency_xr,1) / IFNULL(security_currency_xr,1))) AS position_cost, "
+                    "SUM(IF(transaction_type='SELL', -1, 1) * quantity * security_price * IFNULL(security_currency_xr,1) "
+                        "+ fee * IFNULL(fee_currency_xr,1)) AS position_cost_local, "
+                    "MIN(local_currency), MIN(security_currency) "
+                    "FROM investornetwork.trade "
                     "WHERE portfolio_id = {port_id} "
-                    "GROUP BY ticker "
-                    "ORDER BY ticker ASC"
+                    "GROUP BY symbol, market "
+                    "ORDER BY symbol, market ASC"
                 )
                 cur.execute(sql.format(port_id=port_id))
                 conn.commit()
                 
                 resp_holdings_list = []
-                q_provider = QuoteProvider(60, conn)
+                q_provider = QuoteProvider(300, conn)
                 fx_provider = FXProvider()
                 for row in cur:
                     resp_holdings_list.append(get_holding_item_dic(row, q_provider, fx_provider))
@@ -43,61 +45,56 @@ def get_portfolio_holdings(port_id):
 
 def get_holding_item_dic(row, quote_provider, fx_provider):
     
-    qty = float(row[1])
-    position_cost = float(row[2])
-    position_cost_local = float(row[3])
+    symbol = row[0]
+    qty = float(row[2])
+    position_cost = float(row[3])
+    position_cost_local = float(row[4])
     local_currency = row[5]
-    share_currency = row[6]
-    fee_currency = row[7]
-    if local_currency != share_currency:
+    security_currency = row[6]
+    if local_currency != security_currency:
         diff_curr = True
-        last_fx_rate = fx_provider.get_rate(share_currency, local_currency)
-
-    fee_cost = float(row[4])
-    if fee_currency != share_currency:
-        if fee_currency == local_currency:
-            fee_cost = fee_cost / last_fx_rate
-        else:
-            fee_cost = fee_cost * last_fx_rate
+        last_fx_rate = fx_provider.get_rate(security_currency, local_currency)
     
-    position_cost = position_cost + fee_cost
-    # position_cost_local = 
-
-    avg_cost_per_share = (position_cost - fee_cost) / qty
+    avg_cost_per_share = position_cost / qty
+    avg_exchange_rate = position_cost_local / position_cost
+    last_share_price = quote_provider.get_quote(symbol)
 
     h = {
-        'ticker': row[0],
+        'symbol': symbol,
+        'market': row[1],
+        'security_currency': security_currency,
         'quantity': qty,
-        'avg_cost_per_share': fmt_share_price(avg_cost_per_share),
-        'share_currency': share_currency,
-        'position_cost': fmt_price(position_cost),
-        'position_cost_local': fmt_price(position_cost_local),
+        'position' : {},
         'market_value': {},
         'returns': {}
     }
 
+    h['position']['avg_cost_per_share'] = fmt_share_price(avg_cost_per_share)
+    h['position']['position_cost'] = fmt_price(position_cost)
     if diff_curr:
-        h['avg_exchange_rate'] = fmt_price(position_cost_local / position_cost)
+        h['position']['avg_exchange_rate'] = fmt_price(avg_exchange_rate)
+        h['position']['position_cost_local'] = fmt_price(position_cost_local)
 
-    h['market_value']['share_price'] = fmt_share_price(quote_provider.get_quote(h['ticker']))
-    h['market_value']['position'] = fmt_price(h['quantity'] * h['market_value']['share_price'])
+    h['market_value']['share_price'] = fmt_share_price(last_share_price)
+    h['market_value']['position'] = fmt_price(qty * last_share_price)
+    
     if diff_curr:
         h['market_value']['position_local'] = fmt_price(h['market_value']['position'] * last_fx_rate)
 
     # Capital gains
-    cap_gains = (h['market_value']['share_price'] - h['avg_cost_per_share']) * h['quantity']
+    cap_gains = (last_share_price - avg_cost_per_share) * qty
     if diff_curr:
         cap_gains = cap_gains * last_fx_rate
 
     h['returns']['capital_gains'] = fmt_price(cap_gains)
-    h['returns']['capital_gains_pct'] = fmt_pct(cap_gains / h['position_cost_local'])
+    h['returns']['capital_gains_pct'] = fmt_pct(cap_gains / position_cost_local)
 
     # Currency gains
     if diff_curr:
-        curr_gains = (last_fx_rate - h['avg_exchange_rate']) * h['quantity'] * h['avg_cost_per_share']
+        curr_gains = (last_fx_rate - avg_exchange_rate) * qty * avg_cost_per_share
 
     h['returns']['currency_gains'] = fmt_price(curr_gains)
-    h['returns']['currency_gains_pct'] = fmt_pct(curr_gains / h['position_cost_local'])
+    h['returns']['currency_gains_pct'] = fmt_pct(curr_gains / position_cost_local)
 
     return h
 

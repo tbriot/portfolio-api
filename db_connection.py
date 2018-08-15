@@ -9,7 +9,7 @@ DB_PASSWORD = os.environ.get('DB_PASSWORD') or 'irondesk89'
 DB_NAME = os.environ.get('DB_NAME') or 'investornetwork'
 DB_CONN_TIMEOUT = os.environ.get('DB_CONN_TIMEOUT') or 10
 
-SSH_HOST = 'ec2-35-183-26-189.ca-central-1.compute.amazonaws.com'
+SSH_HOST = 'ec2-35-183-33-109.ca-central-1.compute.amazonaws.com'
 SSH_USERNAME = 'ec2-user'
 SSH_KEY_FILE = r'C:\Users\Thomas\.ssh\tbriot-ca-central-1.pem'
 LOCALHOST = '127.0.0.1'
