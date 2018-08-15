@@ -34,7 +34,7 @@ def get_portfolio_holdings(port_id):
                 
                 resp_holdings_list = []
                 q_provider = QuoteProvider(300, conn)
-                fx_provider = FXProvider()
+                fx_provider = FXProvider(300, conn)
                 for row in cur:
                     resp_holdings_list.append(get_holding_item_dic(row, q_provider, fx_provider))
 
