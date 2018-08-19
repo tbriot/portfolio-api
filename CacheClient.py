@@ -21,8 +21,8 @@ class CacheClient():
     def put(self, store, key, value, ttl=300):
         sql = (
             "INSERT INTO cache (store, key_, value_, expiry_date) "
-            "VALUES('{store}', '{key}', '{value}', (NOW() + {ttl})) "
-            "ON DUPLICATE KEY UPDATE value_='{value}', expiry_date=(NOW() + {ttl})"
+            "VALUES('{store}', '{key}', '{value}', (NOW() + INTERVAL {ttl} SECOND)) "
+            "ON DUPLICATE KEY UPDATE value_='{value}', expiry_date=(NOW() + INTERVAL {ttl} SECOND)"
         )
         with self._conn.cursor() as cur:
             cur.execute(sql.format(
