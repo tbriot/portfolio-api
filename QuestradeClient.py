@@ -6,7 +6,7 @@ from CacheClient import CacheClient
 
 BASE_URL = "https://login.questrade.com"
 TOKEN_URI = BASE_URL + "/oauth2/token"
-ACCOUNT_ACTIVITIES_URI = BASE_URL + "/v1/accounts/{account_id}/activities?startTime={start_time}&endTime={end_time}&"
+ACCOUNT_ACTIVITIES_REL_URI = "v1/accounts/{account_id}/activities?startTime={start_time}&endTime={end_time}&"
 
 CACHE_STORE = "qt_token"
 CACHE_ENTRIES_TTL = int(3600*24*90)
@@ -18,6 +18,28 @@ class QuestradeClient():
         self._user_id = user_id
         self._token = {}
 
+    def get_account_activities(self, account_id, start_date, end_date):
+        rel_url = ACCOUNT_ACTIVITIES_REL_URI.format(
+            account_id = account_id,
+            start_time = self.qt_time_format(start_date),
+            end_time = self.qt_time_format(end_date)
+        )
+        return self.qt_url_get(rel_url)
+
+    @staticmethod
+    def qt_time_format(date):
+        dt = datetime.strptime(date, r"%Y-%m-%d")
+        return dt.strftime(r"%Y-%m-%dT%H:%M:%S-05:00")
+
+    def qt_url_get(self, rel_url, params=None, headers={}):
+        headers["Authorization"] = "Bearer " + self.get_access_token()        
+        url = self._token['api_server'] + rel_url
+        r = requests.get(url, params=params, headers=headers)
+        if r.ok:
+            return r.json()
+        else:
+            r.raise_for_status()
+ 
     def get_access_token(self):
         # check if valid token in memory
         if self._token and datetime.now() < self._token['expiry_date']:
@@ -70,4 +92,6 @@ if __name__ == "__main__":
     from CacheClient import CacheClient
     cache_client = CacheClient()
     qt_client = QuestradeClient(cache_client, "1")
-    print("QT access token=" + qt_client.get_access_token())
+    # print("QT access token=" + qt_client.get_access_token())
+    r = qt_client.get_account_activities("26829536", "2018-08-01", "2018-08-25")
+    print(str(r))
