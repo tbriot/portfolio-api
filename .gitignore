@@ -8,3 +8,4 @@ __pycache__/
 .vscode/
 
 qt_trades.sql
+FX_RATES_DAILY-*.json
