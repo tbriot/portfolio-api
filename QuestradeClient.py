@@ -8,6 +8,7 @@ BASE_URL = "https://login.questrade.com"
 TOKEN_URI = BASE_URL + "/oauth2/token"
 ACCOUNT_ACTIVITIES_REL_URI = "v1/accounts/{account_id}/activities?startTime={start_time}&endTime={end_time}&"
 MARKET_SYMBOL_ID_REL_URI = "v1/symbols/{id}"
+ACCOUNTS_REL_URI = "v1/accounts"
 
 CACHE_STORE_TOKEN = "qt_token"
 CACHE_TTL_TOKEN = int(3600*24*90)
@@ -44,6 +45,9 @@ class QuestradeClient():
          # returns a dict, the dict first item (key = "symbols") is an array of one item ("symbol")
         r = self.qt_url_get(rel_url)
         return r['symbols'][0]
+
+    def get_accounts(self):
+        return self.qt_url_get(ACCOUNTS_REL_URI)
 
     @staticmethod
     def qt_time_format(date):
@@ -112,6 +116,7 @@ if __name__ == "__main__":
 
     cache_client = CacheClient()
     qt_client = QuestradeClient(cache_client, "1")
-    #r = qt_client.get_account_activities("26829536", "2018-08-01", "2018-08-25")
-    r = qt_client.get_symbol_by_id_cached(8049)
+    # r = qt_client.get_account_activities("26829536", "2018-08-01", "2018-08-25")
+    # r = qt_client.get_symbol_by_id_cached(8049)
+    r = qt_client.get_accounts()
     print(str(r))
