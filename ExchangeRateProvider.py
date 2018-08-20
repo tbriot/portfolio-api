@@ -40,7 +40,7 @@ class ExchangeRateProvider:
             if first_row:
                 return first_row[0]
             else:
-                raise Exception("Could not find rate for date=" + date)
+                raise Exception("Could not find rate for date={}, from={}, to={}".format(date, from_c, to_c))
 
 if __name__ == "__main__":
     os.environ['CURCONVERTER_DB_NAME'] = "investornetwork"
