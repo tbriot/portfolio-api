@@ -29,7 +29,8 @@ class QuestradeClient():
             start_time = self.qt_time_format(start_date),
             end_time = self.qt_time_format(end_date)
         )
-        return self.qt_url_get(rel_url)
+        r = self.qt_url_get(rel_url)
+        return r['activities']
 
     def get_symbol_by_id_cached(self, id):
         r = self._cache_client.get(CACHE_STORE_SYMBOL_BY_ID, id)
@@ -47,7 +48,9 @@ class QuestradeClient():
         return r['symbols'][0]
 
     def get_accounts(self):
-        return self.qt_url_get(ACCOUNTS_REL_URI)
+        r = self.qt_url_get(ACCOUNTS_REL_URI)
+        # returns a dict of one item (key = "accounts"). This item contains an array of accounts
+        return r['accounts']
 
     @staticmethod
     def qt_time_format(date):
@@ -65,7 +68,7 @@ class QuestradeClient():
  
     def get_access_token(self):
         # check if valid token in memory
-        if self._token and datetime.now() < self._token['expiry_date']:
+        if self._token and datetime.now() < datetime.strptime(self._token['expiry_date'], r"%Y-%m-%d %H:%M:%S"):
             return self._token['access_token']
 
         # check if valid token in remote cache

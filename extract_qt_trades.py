@@ -1,46 +1,58 @@
-import requests
-from datetime import datetime
+from QuestradeClient import QuestradeClient
+from CacheClient import CacheClient
+from datetime import datetime, timedelta
 import re
 # from activities_sample import ACTIVITIES_SAMPLE
 
-ACCOUNT_ID = "26829536"
-QT_BASE_URL = "https://login.questrade.com"
-QT_OAUTH2_EP = QT_BASE_URL + "/oauth2/token"
+def extract_qt_trades(start_date, end_date):
+    cache = CacheClient() 
+    qt_client = QuestradeClient(cache, 1)
 
-QT_ACCOUNT_CALLS_URI = "v1/accounts/{account_id}/"
-QT_ACCOUNT_ACTIVITIES_URI = QT_ACCOUNT_CALLS_URI + "activities?startTime={start_time}&endTime={end_time}&"
+    file = open("./qt_trades.sql", "a")
+    file.write(build_insert_header())
 
-qt_refresh_token = "XwCWOEuCvlSBv8UweSNqYGPTm4GcwOHH0"
+    accounts = qt_client.get_accounts()
+    for account in accounts:
+        time_periods = split_time_period(start_date, end_date)
+        for start, end in time_periods:
+            activities = qt_client.get_account_activities(
+                account['number'],
+                start,
+                end
+            )
+            for a in activities:
+                if a['type'] == "Trades":
+                    sql = build_insert_statement(a)            
+                    file.write(sql)
 
-start_date = "2018-07-20"
-end_date = "2018-08-17"
+    file.write(build_insert_footer())
+    file.close()
 
-def get_access_token(refresh_token):
-    payload = {
-        "grant_type": "refresh_token",
-        "refresh_token": qt_refresh_token
-    }
-    r = requests.post(QT_OAUTH2_EP, payload)
-    if r.ok:
-        r_json = r.json()
-        return r_json['access_token'], r_json['api_server']
-    else:
-        r.raise_for_status()
+def split_time_period(start_date, end_date):
+    time_periods = []    
 
-def get_activities(access_token, api_server, account_id, start_date, end_date):
-    headers = {"Authorization": "Bearer " + access_token}
-    r = requests.get(
-        api_server + QT_ACCOUNT_ACTIVITIES_URI.format(
-            account_id=account_id,
-            start_time=time_format(start_date),
-            end_time=time_format(end_date)
-        ),
-        headers=headers)
-    if r.ok:
-        r_json = r.json()
-        return r_json['activities']
-    else:
-        r.raise_for_status()
+    start_dt = datetime.strptime(start_date, r"%Y-%m-%d")
+    end_dt = datetime.strptime(end_date, r"%Y-%m-%d")
+
+    current_period_start_dt = start_dt
+
+    iterating = True
+    while iterating:
+        current_period_end_dt = min([current_period_start_dt + timedelta(days=30), end_dt])
+        time_periods.append(
+            [
+                current_period_start_dt.strftime(r"%Y-%m-%d"),
+                current_period_end_dt.strftime(r"%Y-%m-%d")
+            ]
+        )
+
+        if current_period_end_dt == end_dt:
+            iterating = False
+        
+        # next time period start date is current's time period end date + 1 day
+        current_period_start_dt = current_period_end_dt + timedelta(days=1)
+
+    return time_periods
 
 def build_insert_statement(activity):
     return (
@@ -94,11 +106,10 @@ def time_format(date):
     return dt.strftime(r"%Y-%m-%dT%H:%M:%S-05:00")
 
 if __name__ == "__main__":
-    print("START extract tades from Questrade")
-    access_token, api_server = get_access_token(qt_refresh_token)
-    print("Access token retrieved: " + access_token)
-    print("Questrade API server: " + api_server)
-    activities = get_activities(access_token, api_server, ACCOUNT_ID, start_date, end_date)
-    print("Retrieved {} activities successfully".format(len(activities)))
-    generate_sql_dump(activities)
-    print("SQL dump generated")
+    import os
+    os.environ['CACHE_DB_NAME'] = "investornetwork"
+    os.environ['CACHE_DB_PASSWORD'] = "irondesk89"
+    os.environ['CURCONVERTER_DB_NAME'] = "investornetwork"
+    os.environ['CURCONVERTER_DB_PASSWORD'] = "irondesk89"
+    extract_qt_trades("2018-07-01", "2018-08-31")
+    # print(str(split_time_period("2018-08-05", "2018-10-15")))
