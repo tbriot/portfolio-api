@@ -1,19 +1,20 @@
 {
   "version": "2.0",
-  "app_name": "portofolio-api",
+  "app_name": "portfolio-api",
   "stages": {
     "dev": {
-      "api_gateway_stage": "api",
+      "environment_variables": {
+        "CACHE_DB_NAME": "investornetwork",
+        "CACHE_DB_PASSWORD": "irondesk89",
+        "DB_NAME": "investornetwork",
+        "DB_PASSWORD": "irondesk89"
+      },
+      "api_gateway_stage": "dev",
       "lambda_functions": {
-        "foo": {
-          "lambda_timeout": 10,
-          "environment_variables": {
-            "TABLE_NAME": "dev-table",
-            "OTHER_CONFIG": "dev-value"
-          }
+        "portfolio-api": {
+          "lambda_timeout": 10
         }
       }
-
     }
   }
 }

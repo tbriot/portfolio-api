@@ -1,10 +1,15 @@
 from chalice import Chalice
-from QuoteProvider import QuoteProvider
-from FXProvider import FXProvider
-import db_connection
+from chalicelib import CacheClient, QuoteProvider, FXProvider, get_db_conn
 import traceback
 
-app = Chalice(app_name='portofolio-api')
+app = Chalice(app_name='portfolio-api')
+
+import os
+os.environ['CACHE_DB_NAME'] = "investornetwork"
+os.environ['CACHE_DB_PASSWORD'] = "irondesk89"
+cache_client = CacheClient()
+
+os.environ['DB_PASSWORD'] = "irondesk89" 
 
 LOCAL_CURRENCY = 'CAD'
 
@@ -12,40 +17,41 @@ LOCAL_CURRENCY = 'CAD'
 def get_portfolio_holdings(port_id):
     # TODO: add test of 'groupBy' query string param
     try:
-        with db_connection.get_ssh_tunnel() as t:
-            conn = db_connection.get_db_conn(t)
-            with conn.cursor() as cur:
-                print("cursor up")
-                sql = (
-                    "SELECT symbol, market, "
-                    "SUM(quantity) AS qty, "
-                    "SUM(IF(transaction_type='SELL', -1, 1) * quantity * security_price "
-                        "+ fee * (IFNULL(fee_currency_xr,1) / IFNULL(security_currency_xr,1))) AS position_cost, "
-                    "SUM(IF(transaction_type='SELL', -1, 1) * quantity * security_price * IFNULL(security_currency_xr,1) "
-                        "+ fee * IFNULL(fee_currency_xr,1)) AS position_cost_local, "
-                    "MIN(local_currency), MIN(security_currency) "
-                    "FROM investornetwork.trade "
-                    "WHERE portfolio_id = {port_id} "
-                    "GROUP BY symbol, market "
-                    "ORDER BY symbol, market ASC"
-                )
-                cur.execute(sql.format(port_id=port_id))
-                conn.commit()
-                
-                resp_holdings_list = []
-                q_provider = QuoteProvider(300, conn)
-                fx_provider = FXProvider(300, conn)
-                for row in cur:
+        conn = get_db_conn()
+        with conn.cursor() as cur:
+            print("cursor up")
+            sql = (
+                "SELECT symbol, market, "
+                "SUM(quantity) AS qty, "
+                "SUM(IF(transaction_type='SELL', -1, 1) * quantity * security_price "
+                    "+ fee * (IFNULL(fee_currency_xr,1) / IFNULL(security_currency_xr,1))) AS position_cost, "
+                "SUM(IF(transaction_type='SELL', -1, 1) * quantity * security_price * IFNULL(security_currency_xr,1) "
+                    "+ fee * IFNULL(fee_currency_xr,1)) AS position_cost_local, "
+                "MIN(local_currency), MIN(security_currency) "
+                "FROM investornetwork.trade "
+                "WHERE portfolio_id = {port_id} "
+                "GROUP BY symbol, market "
+                "ORDER BY symbol, market ASC"
+            )
+            cur.execute(sql.format(port_id=port_id))
+            conn.commit()
+            
+            resp_holdings_list = []
+            q_provider = QuoteProvider(cache_client)
+            fx_provider = FXProvider(300, conn)
+            for row in cur:
+                if row[1] != "TSX":
                     resp_holdings_list.append(get_holding_item_dic(row, q_provider, fx_provider))
-
-                return resp_holdings_list
+            return resp_holdings_list
     except Exception:
         return traceback.format_exc()
 
 
 def get_holding_item_dic(row, quote_provider, fx_provider):
-    
+    diff_curr=False 
+
     symbol = row[0]
+    market = row[1]
     qty = float(row[2])
     position_cost = float(row[3])
     position_cost_local = float(row[4])
@@ -57,11 +63,13 @@ def get_holding_item_dic(row, quote_provider, fx_provider):
     
     avg_cost_per_share = position_cost / qty
     avg_exchange_rate = position_cost_local / position_cost
-    last_share_price = quote_provider.get_quote(symbol)
+    last_share_price = quote_provider.get_quote(market, symbol)
+    if not last_share_price:
+        print("Unable to fetch current price of symbol=" + symbol)
 
     h = {
         'symbol': symbol,
-        'market': row[1],
+        'market': market,
         'security_currency': security_currency,
         'quantity': qty,
         'position' : {},
@@ -92,9 +100,8 @@ def get_holding_item_dic(row, quote_provider, fx_provider):
     # Currency gains
     if diff_curr:
         curr_gains = (last_fx_rate - avg_exchange_rate) * qty * avg_cost_per_share
-
-    h['returns']['currency_gains'] = fmt_price(curr_gains)
-    h['returns']['currency_gains_pct'] = fmt_pct(curr_gains / position_cost_local)
+        h['returns']['currency_gains'] = fmt_price(curr_gains)
+        h['returns']['currency_gains_pct'] = fmt_pct(curr_gains / position_cost_local)
 
     return h
 

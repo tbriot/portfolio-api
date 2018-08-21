@@ -3,19 +3,19 @@
     {
       "name": "default-role",
       "resource_type": "iam_role",
-      "role_arn": "arn:aws:iam::535992502053:role/portofolio-api-dev",
-      "role_name": "portofolio-api-dev"
+      "role_arn": "arn:aws:iam::535992502053:role/portfolio-api-dev",
+      "role_name": "portfolio-api-dev"
     },
     {
       "name": "api_handler",
       "resource_type": "lambda_function",
-      "lambda_arn": "arn:aws:lambda:ca-central-1:535992502053:function:portofolio-api-dev"
+      "lambda_arn": "arn:aws:lambda:ca-central-1:535992502053:function:portfolio-api-dev"
     },
     {
       "name": "rest_api",
       "resource_type": "rest_api",
-      "rest_api_id": "u5a3sjklsg",
-      "rest_api_url": "https://u5a3sjklsg.execute-api.ca-central-1.amazonaws.com/api/"
+      "rest_api_id": "co5e24qwni",
+      "rest_api_url": "https://co5e24qwni.execute-api.ca-central-1.amazonaws.com/dev/"
     }
   ],
   "schema_version": "2.0",
