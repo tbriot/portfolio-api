@@ -1,11 +1,17 @@
 {
   "version": "2.0",
   "app_name": "portfolio-api",
+  "manage_iam_role": false,
+  "iam_role_arn": "arn:aws:iam::535992502053:role/AWSLambda-ReadWriteRDS-PubLogs",
+  "security_group_ids": ["sg-1ebd2575"],
+  "subnet_ids": ["subnet-cf3e88a7", "subnet-c605f3bc"],
   "stages": {
     "dev": {
       "environment_variables": {
+        "CACHE_DB_HOST": "investornetwork.co0pqf5yoscl.ca-central-1.rds.amazonaws.com",
         "CACHE_DB_NAME": "investornetwork",
         "CACHE_DB_PASSWORD": "irondesk89",
+        "DB_HOST": "investornetwork.co0pqf5yoscl.ca-central-1.rds.amazonaws.com",
         "DB_NAME": "investornetwork",
         "DB_PASSWORD": "irondesk89"
       },

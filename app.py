@@ -4,18 +4,12 @@ import traceback
 
 app = Chalice(app_name='portfolio-api')
 
-import os
-os.environ['CACHE_DB_NAME'] = "investornetwork"
-os.environ['CACHE_DB_PASSWORD'] = "irondesk89"
-cache_client = CacheClient()
-
-os.environ['DB_PASSWORD'] = "irondesk89" 
-
 LOCAL_CURRENCY = 'CAD'
 
 @app.route('/portfolio/{port_id}/holdings')
 def get_portfolio_holdings(port_id):
     # TODO: add test of 'groupBy' query string param
+    cache_client = CacheClient()
     try:
         conn = get_db_conn()
         with conn.cursor() as cur:
@@ -36,6 +30,7 @@ def get_portfolio_holdings(port_id):
             cur.execute(sql.format(port_id=port_id))
             conn.commit()
             
+            print("query successful")
             resp_holdings_list = []
             q_provider = QuoteProvider(cache_client)
             fx_provider = FXProvider(300, conn)
@@ -59,11 +54,16 @@ def get_holding_item_dic(row, quote_provider, fx_provider):
     security_currency = row[6]
     if local_currency != security_currency:
         diff_curr = True
+        print("before fx_provider call")
         last_fx_rate = fx_provider.get_rate(security_currency, local_currency)
+        print("after fx_provider call")
     
     avg_cost_per_share = position_cost / qty
     avg_exchange_rate = position_cost_local / position_cost
+    print("before get quote call")
     last_share_price = quote_provider.get_quote(market, symbol)
+    print("after get quote call")
+
     if not last_share_price:
         print("Unable to fetch current price of symbol=" + symbol)
 

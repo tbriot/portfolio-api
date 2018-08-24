@@ -38,7 +38,9 @@ class FXProvider:
         url_template = 'https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency={from_curr}&to_currency={to_curr}&apikey={key}'
         url = url_template.format(from_curr=from_curr, to_curr=to_curr, key=API_KEY)
         headers = {'Accept': 'application/json'}
+        print("calling alphavantage.co...")
         r = requests.get(url, headers=headers)
+        print("call complete")
         if r.ok:   
             r_json = r.json()
             rate_s = r_json.get(RESP_TOP_LVL_KEY).get(RESP_KEYS['rate'])
