@@ -27,8 +27,8 @@ def get_portfolio_holdings(port_id):
                 "GROUP BY symbol, market "
                 "ORDER BY symbol, market ASC"
             )
-            cur.execute(sql.format(port_id=port_id))
             conn.commit()
+            cur.execute(sql.format(port_id=port_id))
             
             print("query successful")
             resp_holdings_list = []

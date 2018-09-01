@@ -8,7 +8,8 @@ BASE_URL = "https://login.questrade.com"
 TOKEN_URI = BASE_URL + "/oauth2/token"
 ACCOUNT_ACTIVITIES_REL_URI = "v1/accounts/{account_id}/activities?startTime={start_time}&endTime={end_time}&"
 MARKET_SYMBOL_ID_REL_URI = "v1/symbols/{id}"
-MARKET_QUOTES = "v1/markets/quotes/"
+MARKET_SYMBOL_NAME_REL_URI = "v1/symbols?names={name}"
+MARKET_QUOTES_REL_URI = "v1/markets/quotes/{id}"
 ACCOUNTS_REL_URI = "v1/accounts"
 
 
@@ -17,7 +18,11 @@ CACHE_TTL_TOKEN = int(3600*24*90)
 EXPIRY_DATE_FMT = r"%Y-%m-%d %H:%M:%S"
 
 CACHE_STORE_SYMBOL_BY_ID = "qt_symbol_by_id"
+CACHE_STORE_SYMBOL_BY_NAME = "qt_symbol_by_name"
 CACHE_TTL_SYMBOL = 3600*24*7
+
+CACHE_STORE_QUOTE = "qt_quote"
+CACHE_TTL_QUOTE = int(60)
 
 class QuestradeClient():
     def __init__(self, cache_client, user_id):
@@ -48,6 +53,36 @@ class QuestradeClient():
          # returns a dict, the dict first item (key = "symbols") is an array of one item ("symbol")
         r = self.qt_url_get(rel_url)
         return r['symbols'][0]
+
+    def get_symbol_by_name_cached(self, name):
+        r = self._cache_client.get(CACHE_STORE_SYMBOL_BY_NAME, name)
+        if r:
+            return json.loads(r)
+        else:
+            s = self.get_symbol_by_name(name)
+            self._cache_client.put(CACHE_STORE_SYMBOL_BY_NAME, name, json.dumps(s), CACHE_TTL_SYMBOL)
+            return s
+    
+    def get_symbol_by_name(self, name):
+        rel_url = MARKET_SYMBOL_NAME_REL_URI.format(name=name)
+         # returns a dict, the dict first item (key = "symbols") is an array of one item ("symbol")
+        r = self.qt_url_get(rel_url)
+        return r['symbols'][0]
+
+    def get_quote_cached(self, symbol_id):
+        r = self._cache_client.get(CACHE_STORE_QUOTE, str(symbol_id))
+        if r:
+            return json.loads(r)
+        else:
+            s = self.get_quote(symbol_id)
+            self._cache_client.put(CACHE_STORE_QUOTE, str(symbol_id), json.dumps(s), CACHE_TTL_QUOTE)
+            return s
+
+    def get_quote(self, symbol_id):
+        rel_url = MARKET_QUOTES_REL_URI.format(id=str(symbol_id))
+        r = self.qt_url_get(rel_url)
+        # returns a dict, the dict first item (key = "symbolsqutes") is an array of one item
+        return r['quotes'][0]        
 
     def get_accounts(self):
         r = self.qt_url_get(ACCOUNTS_REL_URI)
@@ -103,10 +138,12 @@ class QuestradeClient():
             return None
 
     def get_fresh_token(self, refresh_token):
+        # refresh_token = "9yc5eDQANmSEjqVRCIjW8RUyKDFe5vuk0"
         payload = {
             "grant_type": "refresh_token",
             "refresh_token": refresh_token
         }
+        print("Refresh token=", refresh_token)
         r = requests.post(TOKEN_URI, payload)
         if r.ok:
             return r.json()
@@ -115,7 +152,6 @@ class QuestradeClient():
 
 if __name__ == "__main__":
     import os
-    from CacheClient import CacheClient
     os.environ['CACHE_DB_PASSWORD'] = "irondesk89"
     os.environ['CACHE_DB_NAME'] = "investornetwork"
 
@@ -123,5 +159,7 @@ if __name__ == "__main__":
     qt_client = QuestradeClient(cache_client, "1")
     # r = qt_client.get_account_activities("26829536", "2018-08-01", "2018-08-25")
     # r = qt_client.get_symbol_by_id_cached(8049)
-    r = qt_client.get_accounts()
+    # r = qt_client.get_accounts()
+    # r = qt_client.get_symbol_by_name_cached("BNS.TO")
+    r = qt_client.get_quote_cached(9339)
     print(str(r))
