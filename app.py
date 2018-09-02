@@ -3,15 +3,19 @@ from chalicelib import CacheClient, QuoteProvider, FXProvider, get_db_conn
 import traceback
 
 app = Chalice(app_name='portfolio-api')
-
+app.debug = True
 LOCAL_CURRENCY = 'CAD'
 
 @app.route('/portfolio/{port_id}/holdings')
 def get_portfolio_holdings(port_id):
     # TODO: add test of 'groupBy' query string param
-    cache_client = CacheClient()
     try:
+        print("before cache client")
+        cache_client = CacheClient()
+        print("after cache client")
+        print("before conn")
         conn = get_db_conn()
+        print("after conn") 
         with conn.cursor() as cur:
             print("cursor up")
             sql = (
@@ -35,8 +39,8 @@ def get_portfolio_holdings(port_id):
             q_provider = QuoteProvider(cache_client)
             fx_provider = FXProvider(300, conn)
             for row in cur:
-                if row[1] != "TSX":
-                    resp_holdings_list.append(get_holding_item_dic(row, q_provider, fx_provider))
+                # if row[1] != "TSX":
+                resp_holdings_list.append(get_holding_item_dic(row, q_provider, fx_provider))
             return resp_holdings_list
     except Exception:
         return traceback.format_exc()
@@ -134,3 +138,13 @@ def fmt_pct(pct):
 #
 # See the README documentation for more examples.
 #
+
+# if __name__ == "__main__":
+#     import os
+#     from chalicelib.CacheClient import CacheClient
+#     os.environ['CACHE_DB_PASSWORD'] = "irondesk89"
+#     os.environ['CACHE_DB_NAME'] = "investornetwork"
+#     os.environ['DB_PASSWORD'] = "irondesk89"
+#     os.environ['DB_NAME'] = "investornetwork"
+#     r = get_portfolio_holdings("1")
+#     print(str(r))

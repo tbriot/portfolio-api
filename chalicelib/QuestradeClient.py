@@ -2,7 +2,6 @@ import requests
 import json
 from datetime import datetime, timedelta
 import re
-from chalicelib.CacheClient import CacheClient
 
 BASE_URL = "https://login.questrade.com"
 TOKEN_URI = BASE_URL + "/oauth2/token"
@@ -143,7 +142,7 @@ class QuestradeClient():
             "grant_type": "refresh_token",
             "refresh_token": refresh_token
         }
-        print("Refresh token=", refresh_token)
+        # print("Refresh token=", refresh_token)
         r = requests.post(TOKEN_URI, payload)
         if r.ok:
             return r.json()
@@ -152,6 +151,7 @@ class QuestradeClient():
 
 if __name__ == "__main__":
     import os
+    from chalicelib.CacheClient import CacheClient
     os.environ['CACHE_DB_PASSWORD'] = "irondesk89"
     os.environ['CACHE_DB_NAME'] = "investornetwork"
 
