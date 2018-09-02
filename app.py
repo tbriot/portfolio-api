@@ -1,4 +1,4 @@
-from chalice import Chalice
+from chalice import Chalice, Response
 from chalicelib import CacheClient, QuoteProvider, FXProvider, get_db_conn
 import traceback
 
@@ -10,14 +10,9 @@ LOCAL_CURRENCY = 'CAD'
 def get_portfolio_holdings(port_id):
     # TODO: add test of 'groupBy' query string param
     try:
-        print("before cache client")
         cache_client = CacheClient()
-        print("after cache client")
-        print("before conn")
         conn = get_db_conn()
-        print("after conn") 
         with conn.cursor() as cur:
-            print("cursor up")
             sql = (
                 "SELECT symbol, market, "
                 "SUM(quantity) AS qty, "
@@ -39,9 +34,13 @@ def get_portfolio_holdings(port_id):
             q_provider = QuoteProvider(cache_client)
             fx_provider = FXProvider(300, conn)
             for row in cur:
-                # if row[1] != "TSX":
                 resp_holdings_list.append(get_holding_item_dic(row, q_provider, fx_provider))
-            return resp_holdings_list
+            
+            return Response(
+                body=get_holdings_render_html(resp_holdings_list),
+                status_code=200,
+                headers={'Content-Type': 'text/html'}
+            )
     except Exception:
         return traceback.format_exc()
 
@@ -58,15 +57,11 @@ def get_holding_item_dic(row, quote_provider, fx_provider):
     security_currency = row[6]
     if local_currency != security_currency:
         diff_curr = True
-        print("before fx_provider call")
         last_fx_rate = fx_provider.get_rate(security_currency, local_currency)
-        print("after fx_provider call")
     
     avg_cost_per_share = position_cost / qty
     avg_exchange_rate = position_cost_local / position_cost
-    print("before get quote call")
     last_share_price = quote_provider.get_quote(market, symbol)
-    print("after get quote call")
 
     if not last_share_price:
         print("Unable to fetch current price of symbol=" + symbol)
@@ -119,6 +114,66 @@ def fmt_pct(pct):
     pct = pct * 100
     return float('%.2f' % pct)
 
+def get_holdings_render_html(holdings):
+    html = """
+        <html>
+            <head>
+                <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+            </head>
+            <body>
+                <table class="table table-striped table-hover">
+                    <thead class="thead-light">
+                        <tr> 
+                            <th>symbol</th>
+                            <th>market</th>
+                            <th>currency</th>
+                            <th>qty</th>
+                            <th>avg_cost_per_share</th>
+                            <th>share_price</th>
+                            <th>position cost</th>
+                            <th>capital gains</th>
+                            <th>capital gains %</th>
+                            <th>currency gains</th>
+                            <th>currency gains %</th>
+                        </tr>
+                    </thead>
+    """
+
+    for h in holdings:
+        html += """
+            <tr> 
+                <td>{symbol}</td>
+                <td>{market}</td>
+                <td>{currency}</td>
+                <td>{qty}</td>
+                <td>{avg_cost_per_share}</td>
+                <td>{share_price}</td>
+                <td>{position}</td>
+                <td>{cap_gains}</td>
+                <td>{cap_gains_pct}</td>
+                <td>{curr_gains}</td>
+                <td>{curr_gains_pct}</td>
+            </tr>
+    """.format(
+        symbol=h["symbol"],
+        market=h["market"],
+        currency=h["security_currency"],
+        qty=h["quantity"],
+        avg_cost_per_share=h["position"]["avg_cost_per_share"],
+        share_price=h["market_value"]["share_price"],
+        position=h["market_value"]["position"],
+        cap_gains=h['returns']['capital_gains'],
+        cap_gains_pct=h['returns']['capital_gains_pct'],
+        curr_gains=h.get('returns').get('currency_gains') or "",
+        curr_gains_pct=h.get('returns').get('currency_gains_pct') or ""
+    )
+
+    html += """
+                </table>
+            </body>
+        </html>
+    """
+    return html
 # The view function above will return {"hello": "world"}
 # whenever you make an HTTP GET request to '/'.
 #
@@ -139,12 +194,12 @@ def fmt_pct(pct):
 # See the README documentation for more examples.
 #
 
-# if __name__ == "__main__":
-#     import os
-#     from chalicelib.CacheClient import CacheClient
-#     os.environ['CACHE_DB_PASSWORD'] = "irondesk89"
-#     os.environ['CACHE_DB_NAME'] = "investornetwork"
-#     os.environ['DB_PASSWORD'] = "irondesk89"
-#     os.environ['DB_NAME'] = "investornetwork"
-#     r = get_portfolio_holdings("1")
-#     print(str(r))
+if __name__ == "__main__":
+    import os
+    from chalicelib.CacheClient import CacheClient
+    os.environ['CACHE_DB_PASSWORD'] = "irondesk89"
+    os.environ['CACHE_DB_NAME'] = "investornetwork"
+    os.environ['DB_PASSWORD'] = "irondesk89"
+    os.environ['DB_NAME'] = "investornetwork"
+    r = get_portfolio_holdings("1")
+    print(str(r))

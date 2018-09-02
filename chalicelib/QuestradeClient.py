@@ -21,7 +21,7 @@ CACHE_STORE_SYMBOL_BY_NAME = "qt_symbol_by_name"
 CACHE_TTL_SYMBOL = 3600*24*7
 
 CACHE_STORE_QUOTE = "qt_quote"
-CACHE_TTL_QUOTE = int(60)
+CACHE_TTL_QUOTE = int(60*60*2)
 
 class QuestradeClient():
     def __init__(self, cache_client, user_id):
@@ -96,7 +96,9 @@ class QuestradeClient():
     def qt_url_get(self, rel_url, params=None, headers={}):
         headers["Authorization"] = "Bearer " + self.get_access_token()        
         url = self._token['api_server'] + rel_url
+        print("Calling Questrade..., url=", url)
         r = requests.get(url, params=params, headers=headers)
+        print("Response received")
         if r.ok:
             return r.json()
         else:
