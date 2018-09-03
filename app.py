@@ -36,8 +36,12 @@ def get_portfolio_holdings(port_id):
             for row in cur:
                 resp_holdings_list.append(get_holding_item_dic(row, q_provider, fx_provider))
             
+            output_json = {
+                "holdings": resp_holdings_list,
+                "summary": compute_summary(resp_holdings_list)
+            }
             return Response(
-                body=get_holdings_render_html(resp_holdings_list),
+                body=get_holdings_render_html(output_json),
                 status_code=200,
                 headers={'Content-Type': 'text/html'}
             )
@@ -81,6 +85,9 @@ def get_holding_item_dic(row, quote_provider, fx_provider):
     if diff_curr:
         h['position']['avg_exchange_rate'] = fmt_price(avg_exchange_rate)
         h['position']['position_cost_local'] = fmt_price(position_cost_local)
+    else:
+        h['position']['avg_exchange_rate'] = None
+        h['position']['position_cost_local'] = None     
 
     h['market_value']['share_price'] = fmt_share_price(last_share_price)
     h['market_value']['position'] = fmt_price(qty * last_share_price)
@@ -101,8 +108,35 @@ def get_holding_item_dic(row, quote_provider, fx_provider):
         curr_gains = (last_fx_rate - avg_exchange_rate) * qty * avg_cost_per_share
         h['returns']['currency_gains'] = fmt_price(curr_gains)
         h['returns']['currency_gains_pct'] = fmt_pct(curr_gains / position_cost_local)
+    else:
+        curr_gains = 0
+        h['returns']['currency_gains'] = None
+        h['returns']['currency_gains_pct'] = None  
+
+    # Total gains
+    total_gains = cap_gains + (curr_gains or 0)
+    h['returns']['total_gains'] = fmt_price(total_gains)
+    h['returns']['total_gains_pct'] = fmt_pct(total_gains / position_cost_local)
 
     return h
+
+def compute_summary(holdings):
+    cap_gains, curr_gains = 0, 0
+    pos_cost_local = 0
+    for h in holdings:
+        cap_gains += h['returns']['capital_gains']
+        curr_gains += h['returns']['currency_gains'] or 0
+        pos_cost_local += h['position']['position_cost_local'] or h['position']['position_cost']
+    total_gains = cap_gains + curr_gains
+    return {
+        "position_local": fmt_price(pos_cost_local),
+        "capital_gains": fmt_price(cap_gains),
+        "capital_gains_pct": fmt_pct(cap_gains/pos_cost_local),
+        "currency_gains": fmt_price(curr_gains),
+        "currency_gains_pct": fmt_pct(curr_gains/pos_cost_local),
+        "total_gains": fmt_price(total_gains),
+        "total_gains_pct": fmt_pct(total_gains / pos_cost_local)
+    }
 
 def fmt_share_price(price):
     return float('%.3f' % price)
@@ -114,7 +148,7 @@ def fmt_pct(pct):
     pct = pct * 100
     return float('%.2f' % pct)
 
-def get_holdings_render_html(holdings):
+def get_holdings_render_html(output_json):
     html = """
         <html>
             <head>
@@ -135,11 +169,13 @@ def get_holdings_render_html(holdings):
                             <th>capital gains %</th>
                             <th>currency gains</th>
                             <th>currency gains %</th>
+                            <th>total gains</th>
+                            <th>total gains %</th>
                         </tr>
                     </thead>
     """
 
-    for h in holdings:
+    for h in output_json["holdings"]:
         html += """
             <tr> 
                 <td>{symbol}</td>
@@ -153,6 +189,8 @@ def get_holdings_render_html(holdings):
                 <td>{cap_gains_pct}</td>
                 <td>{curr_gains}</td>
                 <td>{curr_gains_pct}</td>
+                <td>{total_gains}</td>
+                <td>{total_gains_pct}</td>               
             </tr>
     """.format(
         symbol=h["symbol"],
@@ -164,10 +202,32 @@ def get_holdings_render_html(holdings):
         position=h["market_value"]["position"],
         cap_gains=h['returns']['capital_gains'],
         cap_gains_pct=h['returns']['capital_gains_pct'],
-        curr_gains=h.get('returns').get('currency_gains') or "",
-        curr_gains_pct=h.get('returns').get('currency_gains_pct') or ""
+        curr_gains=h['returns']['currency_gains'] or "n/a",
+        curr_gains_pct=h['returns']['currency_gains_pct'] or "n/a",
+        total_gains=h['returns']['total_gains'],
+        total_gains_pct=h['returns']['total_gains_pct']
     )
 
+    html += """
+               <tr> 
+                   <td colspan="6">Total</td>
+                   <td>{position}</td>
+                   <td>{cap_gains}</td>
+                   <td>{cap_gains_pct}</td>
+                   <td>{curr_gains}</td>
+                   <td>{curr_gains_pct}</td>
+                   <td>{total_gains}</td>
+                   <td>{total_gains_pct}</td>   
+               </tr>
+       """.format(
+           position=output_json["summary"]["position_local"],
+           cap_gains=output_json["summary"]['capital_gains'],
+           cap_gains_pct=output_json["summary"]['capital_gains_pct'],
+           curr_gains=output_json["summary"]['currency_gains'],
+           curr_gains_pct=output_json["summary"]['currency_gains_pct'],
+           total_gains=output_json["summary"]['total_gains'],
+           total_gains_pct=output_json["summary"]['total_gains_pct']
+       )   
     html += """
                 </table>
             </body>
