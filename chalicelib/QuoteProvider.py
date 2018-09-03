@@ -15,7 +15,9 @@ class QuoteProvider:
         symb = self._qt_client.get_symbol_by_name_cached(qt_symbol)
         qt_symbol_id = symb["symbolId"]
         # get security quote from QT 
-        q = self._qt_client.get_quote(qt_symbol_id)
+        q = self._qt_client.get_quote_cached(qt_symbol_id)
+        if not q["lastTradePrice"]:
+            raise Exception("Quote for ticker={} has no lastTradePrice attribute".format(qt_symbol))
         return float(q["lastTradePrice"])
 
 if __name__ == "__main__":

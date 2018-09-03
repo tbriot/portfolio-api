@@ -1,11 +1,10 @@
-from QuestradeClient import QuestradeClient
-from CacheClient import CacheClient
-from ExchangeRateProvider import ExchangeRateProvider
+from chalicelib.QuestradeClient import QuestradeClient
+from chalicelib.CacheClient import CacheClient
+from chalicelib.ExchangeRateProvider import ExchangeRateProvider
 from datetime import datetime, timedelta
 import re
-# from activities_sample import ACTIVITIES_SAMPLE
 
-def extract_qt_trades(start_date, end_date):
+def extract_qt_trades(start_date, end_date, accounts):
     cache = CacheClient() 
     qt_client = QuestradeClient(cache, 1)
     xr_provider = ExchangeRateProvider()
@@ -13,8 +12,7 @@ def extract_qt_trades(start_date, end_date):
     file = open("./qt_trades.sql", "a")
     file.write(build_insert_header())
 
-    accounts = qt_client.get_accounts()
-    for account in accounts:
+    for account in accounts or qt_client.get_accounts():
         print("----------------------------------------")
         print("Processing account=" + account['number'])
         time_periods = split_time_period(start_date, end_date)
@@ -144,5 +142,5 @@ if __name__ == "__main__":
     os.environ['CACHE_DB_PASSWORD'] = "irondesk89"
     os.environ['CURCONVERTER_DB_NAME'] = "investornetwork"
     os.environ['CURCONVERTER_DB_PASSWORD'] = "irondesk89"
-    extract_qt_trades("2018-07-01", "2018-08-31")
+    extract_qt_trades("2018-01-02", "2019-01-01", [{"number": "26829536"}])
     # print(str(split_time_period("2018-08-05", "2018-10-15")))

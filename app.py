@@ -14,6 +14,7 @@ def get_portfolio_holdings(port_id):
         conn = get_db_conn()
         with conn.cursor() as cur:
             sql = (
+                "SELECT * from ("
                 "SELECT symbol, market, "
                 "SUM(quantity) AS qty, "
                 "SUM(IF(transaction_type='SELL', -1, 1) * quantity * security_price "
@@ -23,8 +24,9 @@ def get_portfolio_holdings(port_id):
                 "MIN(local_currency), MIN(security_currency) "
                 "FROM investornetwork.trade "
                 "WHERE portfolio_id = {port_id} "
-                "GROUP BY symbol, market "
-                "ORDER BY symbol, market ASC"
+                "GROUP BY symbol, market) t "
+                "WHERE qty<>0 "
+                "ORDER BY position_cost_local DESC"
             )
             conn.commit()
             cur.execute(sql.format(port_id=port_id))
